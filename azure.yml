@@ -1,0 +1,51 @@
+name: "Terraform-Azure"
+
+on:
+ workflow_dispatch:
+   inputs:
+     client_name:        
+       description: Enter the client name (in small letters)
+       required: true
+       default: ''
+
+jobs:
+
+  terraform:
+    name: "Azure"
+    env:
+      ROOT_PATH: '${{github.workspace}}/terraform'
+      ARM_CLIENT_ID: ${{ secrets.AZURE_AD_CLIENT_ID }}
+      ARM_CLIENT_SECRET: ${{ secrets.AZURE_AD_CLIENT_SECRET }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_AD_TENANT_ID }}
+      CLIENT_VARFILE : ./InputVariables/${{ github.event.inputs.client_name }}_var.auto.tfvars
+    runs-on: dwsinfracode-linux-dev
+    environment: dev
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+      
+    - name: Setup terraform
+      uses: hashicorp/setup-terraform@v1
+      
+    - name: terraform Init
+      #run: terraform init -reconfigure --backend-config="key=client1/terraform_state"
+      run: terraform init -reconfigure --backend-config="key=${{ github.event.inputs.client_name }}/terraform_state"
+      working-directory: ${{ env.ROOT_PATH }}
+
+    - name: 'Terraform Validate'
+      run: terraform validate
+      working-directory: ${{ env.ROOT_PATH }}
+      
+    - name: 'Terraform Plan'
+      run: terraform plan -lock=false --var-file=${{ env.CLIENT_VARFILE }}      
+      working-directory: ${{ env.ROOT_PATH }}
+   
+    - name: 'Terraform Apply'
+      run: terraform apply -lock=false --var-file=${{ env.CLIENT_VARFILE }} -auto-approve
+      working-directory: ${{ env.ROOT_PATH }}
+        
